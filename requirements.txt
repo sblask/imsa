@@ -1,0 +1,5 @@
+argcomplete
+boto3
+pyramid
+requests
+pyyaml
