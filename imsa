@@ -1,0 +1,230 @@
+#!/usr/bin/env python
+import argparse
+import datetime
+import inspect
+import os
+import sys
+import threading
+import wsgiref.simple_server
+
+import argcomplete
+import boto3
+import pyramid.config
+import pyramid.response
+import pyramid.view
+import requests
+import yaml
+
+
+IP_ADDRESS = '169.254.169.254'
+INVALID_CREDENTIAL_PATH = '/latest/meta-data/iam/security-credentials'
+CREDENTIAL_PATH = INVALID_CREDENTIAL_PATH + '/'
+DUMMY_ROLE = 'imsa'
+CONTROL_PATH = '/__imsa/%s/'
+
+MINIMUM_MINUTES_IN_SESSION = 5
+
+
+def main():
+    config = __load_config()
+    arguments = __get_arguments(config)
+    arguments.function(config, arguments)
+
+
+def __load_config():
+    with open(os.path.expanduser('~/.imsa'), 'r') as file_object:
+        return yaml.load(file_object)
+
+
+def __get_arguments(config):
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(title='Available commands')
+
+    server_parser = subparsers.add_parser('start')
+    server_parser.set_defaults(function=start_server)
+
+    server_parser = subparsers.add_parser('stop')
+    server_parser.set_defaults(function=client_stop)
+
+    choices = sorted(config.keys())
+    choices.remove('default')
+    assume_parser = subparsers.add_parser('assume')
+    assume_parser.set_defaults(function=client_assume)
+    assume_parser.add_argument(
+        'role',
+        choices=choices,
+    )
+
+    argcomplete.autocomplete(parser)
+    return parser.parse_args()
+
+
+def start_server(_config, _arguments):
+    with pyramid.config.Configurator() as config:
+        __discover_routes(config)
+        app = config.make_wsgi_app()
+
+    server = wsgiref.simple_server.make_server(IP_ADDRESS, 80, app)
+    State.get_instance().server = server
+    server.serve_forever()
+
+
+def __register_route(route):
+    def wrapper(fun):
+        fun.route = route
+        return fun
+    return wrapper
+
+
+def __discover_routes(config):
+    for name, object_ in inspect.getmembers(sys.modules[__name__]):
+        if inspect.isfunction(object_) and hasattr(object_, 'route'):
+            config.add_route(name, object_.route)
+            config.add_view(object_, route_name=name)
+
+
+class State():
+
+    def __init__(self):
+        self.server = None
+        self.role_config = {}
+        self.session_credentials = {}
+        self.role_credentials = {}
+
+    @classmethod
+    def get_instance(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = State()
+        return cls.instance
+
+    def is_session_valid(self):
+        if not self.session_credentials:
+            return False
+
+        if self.__have_credentials_expired(self.session_credentials):
+            return False
+
+        return True
+
+    def __have_credentials_expired(self, credentials):
+        now = datetime.datetime.utcnow()
+        soon = now + datetime.timedelta(minutes=MINIMUM_MINUTES_IN_SESSION)
+        expiration = credentials['Expiration'].replace(tzinfo=None)
+        return expiration < soon
+
+    def update_session_credentials(self):
+        client = boto3.client(
+            'sts',
+            aws_access_key_id=self.role_config['aws_access_key_id'],
+            aws_secret_access_key=self.role_config['aws_secret_access_key'],
+            region_name=self.role_config['region_name'],
+        )
+        response = client.get_session_token(
+            SerialNumber=self.role_config['mfa_serial_number'],
+            TokenCode=self.role_config['mfa_token_code'],
+        )
+        self.session_credentials = response['Credentials']
+        self.session_credentials['LastUpdated'] = datetime.datetime.utcnow()
+
+    def update_role_credentials(self):
+        client = boto3.client(
+            'sts',
+            aws_access_key_id=self.session_credentials['AccessKeyId'],
+            aws_secret_access_key=self.session_credentials['SecretAccessKey'],
+            aws_session_token=self.session_credentials['SessionToken'],
+        )
+        response = client.assume_role(
+            RoleArn=self.role_config['role_arn'],
+            RoleSessionName=self.role_config['role_session_name'],
+        )
+        self.role_credentials = response['Credentials']
+        self.role_credentials['LastUpdated'] = datetime.datetime.utcnow()
+
+    def maybe_update_role_credentials(self):
+        if not self.role_credentials:
+            return
+        if self.__have_credentials_expired(self.role_credentials):
+            self.update_role_credentials()
+
+
+@__register_route(INVALID_CREDENTIAL_PATH)
+def server_get_role_one(_request):
+    return pyramid.httpexceptions.HTTPMovedPermanently(CREDENTIAL_PATH)
+
+
+@__register_route(CREDENTIAL_PATH)
+def server_get_role_two(_request):
+    return pyramid.response.Response(DUMMY_ROLE)
+
+
+@__register_route(CREDENTIAL_PATH + DUMMY_ROLE)
+def server_get_credentials(_request):
+    state = State.get_instance()
+    state.maybe_update_role_credentials()
+    credentials = state.role_credentials or state.session_credentials
+    if not credentials:
+        return pyramid.httpexceptions.HTTPNotFound('No role assumed')
+    return pyramid.response.Response(json=__make_response_dict(credentials))
+
+
+def __make_response_dict(credentials):
+    return {
+        'AccessKeyId': credentials['AccessKeyId'],
+        'Code': 'Success',
+        'Expiration': __format_datetime(credentials['Expiration']),
+        'LastUpdated': __format_datetime(credentials['LastUpdated']),
+        'SecretAccessKey': credentials['SecretAccessKey'],
+        'Token': credentials['SessionToken'],
+        'Type': 'AWS-HMAC',
+    }
+
+
+def __format_datetime(datetime_object):
+    cleaned = datetime_object.replace(microsecond=0, tzinfo=None)
+    return cleaned.isoformat('T') + 'Z'
+
+
+@__register_route(CONTROL_PATH % 'stop')
+def server_stop(_request):
+    server = State.get_instance().server
+    threading.Thread(target=server.shutdown).start()
+
+
+@__register_route(CONTROL_PATH % 'assume')
+def server_assume(request):
+    state = State.get_instance()
+    role_config = request.json
+    state.role_config = role_config
+
+    if not state.is_session_valid():
+        if 'mfa_token_code' not in role_config:
+            return pyramid.httpexceptions.HTTPBadRequest('MFA missing')
+        state.update_session_credentials()
+    state.update_role_credentials()
+    return pyramid.response.Response()
+
+
+def client_stop(_config, _arguments):
+    requests.post(
+        'http://' + IP_ADDRESS + CONTROL_PATH % 'stop',
+    )
+
+
+def client_assume(config, arguments):
+    url = 'http://' + IP_ADDRESS + CONTROL_PATH % 'assume'
+
+    role_config = {}
+    role_config.update(config['default'])
+    role_config.update(config[arguments.role])
+
+    response = requests.post(url, json=role_config)
+    if response.status_code == 400 and 'MFA missing' in response.text:
+        role_config['mfa_token_code'] = input('Enter MFA: ')
+        response = requests.post(url, json=role_config)
+
+    if response.status_code != 200:
+        print(response.text)
+
+
+if __name__ == '__main__':
+    main()
