@@ -1,2 +1,2 @@
-# imsa
-Instance Metadata Service for Authentification
+IMSA (Instance Metadata Service for Authentication)
+===================================================
