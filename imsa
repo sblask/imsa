@@ -2,6 +2,8 @@
 import argparse
 import datetime
 import inspect
+import logging
+import logging.handlers
 import os
 import sys
 import threading
@@ -15,6 +17,10 @@ import pyramid.view
 import requests
 import yaml
 
+logger = logging.getLogger(__name__)
+
+
+LOG_FORMAT = '%(asctime)s - %(levelname)5s - %(name)s - %(message)s'
 
 IP_ADDRESS = '169.254.169.254'
 INVALID_CREDENTIAL_PATH = '/latest/meta-data/iam/security-credentials'
@@ -44,6 +50,11 @@ def __get_arguments(config):
     start_parser.set_defaults(function=start_server)
     __add_common_arguments(start_parser)
 
+    start_parser.add_argument(
+        '--log-file',
+        help='Log to this file instead of the command line',
+    )
+
     stop_parser = subparsers.add_parser('stop')
     stop_parser.set_defaults(function=client_stop)
     __add_common_arguments(stop_parser)
@@ -72,13 +83,34 @@ def __add_common_arguments(parser):
 
 
 def start_server(_config, arguments):
+    __configure_logging(arguments)
     with pyramid.config.Configurator() as config:
         __discover_routes(config)
         app = config.make_wsgi_app()
 
+    logger.info('Start server')
     server = wsgiref.simple_server.make_server(IP_ADDRESS, arguments.port, app)
     State.get_instance().server = server
+    logger.info('Accept requests')
     server.serve_forever()
+
+
+def __configure_logging(arguments):
+    if arguments.log_file:
+        handler = logging.handlers.RotatingFileHandler(
+            arguments.log_file,
+            maxBytes=5120,
+            backupCount=5,
+        )
+        handlers = [handler]
+    else:
+        handlers = None
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format=LOG_FORMAT,
+        handlers=handlers,
+    )
 
 
 def __register_route(route):
@@ -125,6 +157,7 @@ class State():
         return expiration < soon
 
     def update_session_credentials(self):
+        logger.info('Update session credentials')
         client = boto3.client(
             'sts',
             aws_access_key_id=self.role_config['aws_access_key_id'],
@@ -139,6 +172,7 @@ class State():
         self.session_credentials['LastUpdated'] = datetime.datetime.utcnow()
 
     def update_role_credentials(self):
+        logger.info('Update role credentials')
         client = boto3.client(
             'sts',
             aws_access_key_id=self.session_credentials['AccessKeyId'],
@@ -198,6 +232,7 @@ def __format_datetime(datetime_object):
 
 @__register_route(CONTROL_PATH % 'stop')
 def server_stop(_request):
+    logger.info('Stop server')
     server = State.get_instance().server
     threading.Thread(target=server.shutdown).start()
     return pyramid.response.Response()
