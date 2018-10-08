@@ -200,6 +200,7 @@ def __format_datetime(datetime_object):
 def server_stop(_request):
     server = State.get_instance().server
     threading.Thread(target=server.shutdown).start()
+    return pyramid.response.Response()
 
 
 @__register_route(CONTROL_PATH % 'assume')
