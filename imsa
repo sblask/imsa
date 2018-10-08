@@ -82,6 +82,13 @@ def __add_common_arguments(parser):
     )
 
 
+class LoggingWSGIRequestHandler(wsgiref.simple_server.WSGIRequestHandler):
+
+    # pylint: disable=redefined-builtin
+    def log_message(self, format, *args):
+        logger.info(' '.join([self.client_address[0], *args]))
+
+
 def start_server(_config, arguments):
     __configure_logging(arguments)
     with pyramid.config.Configurator() as config:
@@ -89,7 +96,12 @@ def start_server(_config, arguments):
         app = config.make_wsgi_app()
 
     logger.info('Start server')
-    server = wsgiref.simple_server.make_server(IP_ADDRESS, arguments.port, app)
+    server = wsgiref.simple_server.make_server(
+        IP_ADDRESS,
+        arguments.port,
+        app,
+        handler_class=LoggingWSGIRequestHandler,
+    )
     State.get_instance().server = server
     logger.info('Accept requests')
     server.serve_forever()
