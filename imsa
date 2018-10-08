@@ -42,13 +42,17 @@ def __get_arguments(config):
 
     start_parser = subparsers.add_parser('start')
     start_parser.set_defaults(function=start_server)
+    __add_common_arguments(start_parser)
 
     stop_parser = subparsers.add_parser('stop')
     stop_parser.set_defaults(function=client_stop)
+    __add_common_arguments(stop_parser)
 
     choices = sorted(config.keys())
     choices.remove('default')
     assume_parser = subparsers.add_parser('assume')
+    __add_common_arguments(assume_parser)
+
     assume_parser.set_defaults(function=client_assume)
     assume_parser.add_argument(
         'role',
@@ -59,12 +63,20 @@ def __get_arguments(config):
     return parser.parse_args()
 
 
-def start_server(_config, _arguments):
+def __add_common_arguments(parser):
+    parser.add_argument(
+        '--port',
+        default=80,
+        type=int,
+    )
+
+
+def start_server(_config, arguments):
     with pyramid.config.Configurator() as config:
         __discover_routes(config)
         app = config.make_wsgi_app()
 
-    server = wsgiref.simple_server.make_server(IP_ADDRESS, 80, app)
+    server = wsgiref.simple_server.make_server(IP_ADDRESS, arguments.port, app)
     State.get_instance().server = server
     server.serve_forever()
 
@@ -204,14 +216,16 @@ def server_assume(request):
     return pyramid.response.Response()
 
 
-def client_stop(_config, _arguments):
+def client_stop(_config, arguments):
+    address = ':'.join([IP_ADDRESS, str(arguments.port)])
     requests.post(
-        'http://' + IP_ADDRESS + CONTROL_PATH % 'stop',
+        'http://' + address + CONTROL_PATH % 'stop',
     )
 
 
 def client_assume(config, arguments):
-    url = 'http://' + IP_ADDRESS + CONTROL_PATH % 'assume'
+    address = ':'.join([IP_ADDRESS, str(arguments.port)])
+    url = 'http://' + address + CONTROL_PATH % 'assume'
 
     role_config = {}
     role_config.update(config['default'])
