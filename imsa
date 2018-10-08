@@ -40,11 +40,11 @@ def __get_arguments(config):
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(title='Available commands')
 
-    server_parser = subparsers.add_parser('start')
-    server_parser.set_defaults(function=start_server)
+    start_parser = subparsers.add_parser('start')
+    start_parser.set_defaults(function=start_server)
 
-    server_parser = subparsers.add_parser('stop')
-    server_parser.set_defaults(function=client_stop)
+    stop_parser = subparsers.add_parser('stop')
+    stop_parser.set_defaults(function=client_stop)
 
     choices = sorted(config.keys())
     choices.remove('default')
