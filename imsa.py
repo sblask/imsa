@@ -230,7 +230,7 @@ def server_get_credentials(_request):
         return pyramid.response.Response(json=__make_response_dict(credentials))
     except botocore.exceptions.ClientError as exception:
         error_message = exception.response['Error']['Message']
-        logger.warn(error_message)
+        logger.warning(error_message)
         return pyramid.httpexceptions.HTTPNotFound(error_message)
     except Exception:
         logger.exception('Error getting credentials')
