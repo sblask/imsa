@@ -1,0 +1,11 @@
+[Unit]
+Description=IMSA
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/imsa start --log-file /var/log/imsa.log
+ExecStop=/usr/bin/imsa stop
+
+[Install]
+WantedBy=multi-user.target
