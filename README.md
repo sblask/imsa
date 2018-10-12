@@ -33,6 +33,59 @@ imsa assume profile_TWO
 imsa stop
 ```
 
+Installation
+------------
+
+Being a Python package, you can install IMSA using pip. I would recommend
+installing it into a virtualenv:
+
+```bash
+sudo virtualenv /opt/imsa
+sudo /opt/imsa/bin/pip install git+https://github.com/sblask/imsa.git
+sudo ln -s /opt/imsa/bin/imsa /usr/bin
+
+```
+
+The instance metadata service in EC2 is available at 169.254.169.254. So you
+need to get your machine to listen at 169.254.169.254 too. As you do not want
+to expose your AWS credentials to the outside(you still need to be careful with
+proxies and the like), you need to add the IP to your loopback device which
+restricts its availability to your machine. This can be done by editing
+`/etc/network/interfaces`. Assuming it looks like this:
+
+```
+auto lo
+iface lo inet loopback
+```
+
+You need to change it to this:
+
+```
+auto lo lo:imsa
+iface lo inet loopback
+
+iface lo:imsa inet static
+  address 169.254.169.254
+  network 169.254.169.254
+  netmask 255.255.255.0
+```
+
+If you want to run IMSA at startup you can use the serviced unit file
+`imsa.service`(which assumes the above installation path):
+
+```
+sudo cp imsa.service /etc/systemd/system/
+sudo systemctl enable imsa.service
+```
+
+If you don't want to reboot your machine to make the IP setup work and IMSA
+start up, you can run the following:
+
+```
+sudo systemctl restart networking.service
+sudo systemctl start imsa.service
+```
+
 Configuration
 -------------
 
