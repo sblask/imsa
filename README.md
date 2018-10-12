@@ -22,8 +22,9 @@ Usage
 ```bash
 # check out available options
 imsa --help
-# you can set this up to run when your machine starts up
-imsa start
+# as the service run on port 80, sudo is required,
+# but you may want to run this on startup anyway(see Installation)
+sudo imsa start
 # after this you can run a few aws commands that will use profile_one
 imsa assume profile_one
 # after this you can run a few aws commands that will use profile_one
