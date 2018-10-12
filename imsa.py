@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import datetime
+import functools
 import inspect
 import logging
 import logging.handlers
@@ -31,11 +32,12 @@ CONTROL_PATH = '/__imsa/%s/'
 
 MINIMUM_MINUTES_IN_SESSION = 5
 
+HELP_STRINGS = ['-h', '--h', '--he', '--hel', '--help']
+
 
 def main():
-    config = __load_config()
-    arguments = __get_arguments(config)
-    arguments.function(config, arguments)
+    arguments = __get_arguments()
+    arguments.function(arguments)
 
 
 def __load_config():
@@ -43,9 +45,13 @@ def __load_config():
         return yaml.load(file_object)
 
 
-def __get_arguments(config):
+def __get_arguments():
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(title='Available commands')
+    subparsers = parser.add_subparsers(
+        title='Available commands',
+        dest='command',
+    )
+    subparsers.required = True
 
     start_parser = subparsers.add_parser('start')
     start_parser.set_defaults(function=server_start)
@@ -60,16 +66,25 @@ def __get_arguments(config):
     stop_parser.set_defaults(function=client_stop)
     __add_common_arguments(stop_parser)
 
-    choices = sorted(config.keys())
-    choices.remove('default')
     assume_parser = subparsers.add_parser('assume')
     __add_common_arguments(assume_parser)
 
-    assume_parser.set_defaults(function=client_assume)
-    assume_parser.add_argument(
-        'role',
-        choices=choices,
-    )
+    def completer(**_kwargs):
+        return sorted(__load_config().keys())
+
+    profile_argument = assume_parser.add_argument('profile')
+    profile_argument.completer = completer
+
+    is_help_call = any([string in sys.argv for string in HELP_STRINGS])
+    # parse_known_args would break argcomplete and help
+    if len(sys.argv) > 1 and sys.argv[1] == 'assume' or is_help_call:
+        config = __load_config()
+        choices = sorted(config.keys())
+
+        profile_argument.choices = choices
+
+        function = functools.partial(client_assume, config)
+        assume_parser.set_defaults(function=function)
 
     argcomplete.autocomplete(parser)
     return parser.parse_args()
@@ -90,7 +105,7 @@ class LoggingWSGIRequestHandler(wsgiref.simple_server.WSGIRequestHandler):
         logger.info(' '.join([self.client_address[0], *args]))
 
 
-def server_start(_config, arguments):
+def server_start(arguments):
     try:
         __configure_logging(arguments)
         with pyramid.config.Configurator() as config:
@@ -284,7 +299,7 @@ def server_assume(request):
         return pyramid.httpexceptions.HTTPInternalServerError()
 
 
-def client_stop(_config, arguments):
+def client_stop(arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
     requests.post(
         'http://' + address + CONTROL_PATH % 'stop',
@@ -297,7 +312,7 @@ def client_assume(config, arguments):
 
     role_config = {}
     role_config.update(config['default'])
-    role_config.update(config[arguments.role])
+    role_config.update(config[arguments.profile])
 
     response = requests.post(url, json=role_config)
     if response.status_code == 400 and 'MFA missing' in response.text:
