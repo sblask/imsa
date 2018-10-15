@@ -55,7 +55,16 @@ def __get_arguments():
     )
     subparsers.required = True
 
-    start_parser = subparsers.add_parser('start')
+    __add_start_parser(subparsers)
+    __add_stop_parser(subparsers)
+    __add_assume_parser(subparsers)
+
+    argcomplete.autocomplete(parser)
+    return parser.parse_args()
+
+
+def __add_start_parser(parser):
+    start_parser = parser.add_parser('start')
     start_parser.set_defaults(function=server_start)
     __add_common_arguments(start_parser)
 
@@ -64,20 +73,21 @@ def __get_arguments():
         help='Log to this file instead of the command line',
     )
 
-    stop_parser = subparsers.add_parser('stop')
+
+def __add_stop_parser(parser):
+    stop_parser = parser.add_parser('stop')
     stop_parser.set_defaults(function=client_stop)
     __add_common_arguments(stop_parser)
 
-    assume_parser = subparsers.add_parser('assume')
+
+def __add_assume_parser(parser):
+    assume_parser = parser.add_parser('assume')
     __add_common_arguments(assume_parser)
 
-    def completer(**_kwargs):
-        return sorted(__load_config().keys())
-
     profile_argument = assume_parser.add_argument('profile')
-    profile_argument.completer = completer
 
     is_help_call = any([string in sys.argv for string in HELP_STRINGS])
+    # config should only be loaded for assume, not the other commands
     # parse_known_args would break argcomplete and help
     if len(sys.argv) > 1 and sys.argv[1] == 'assume' or is_help_call:
         config = __load_config()
@@ -88,8 +98,12 @@ def __get_arguments():
         function = functools.partial(client_assume, config)
         assume_parser.set_defaults(function=function)
 
-    argcomplete.autocomplete(parser)
-    return parser.parse_args()
+    # need to add this completer as choices is not available during completion
+    profile_argument.completer = __profile_completer
+
+
+def __profile_completer(**_kwargs):
+    return sorted(__load_config().keys())
 
 
 def __add_common_arguments(parser):
