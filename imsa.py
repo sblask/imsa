@@ -178,7 +178,7 @@ class State():
 
     def __init__(self):
         self.server = None
-        self.role_config = {}
+        self.profile_config = {}
         self.session_credentials = {}
         self.role_credentials = {}
 
@@ -207,13 +207,13 @@ class State():
         logger.info('Update session credentials')
         client = boto3.client(
             'sts',
-            aws_access_key_id=self.role_config['aws_access_key_id'],
-            aws_secret_access_key=self.role_config['aws_secret_access_key'],
-            region_name=self.role_config['region_name'],
+            aws_access_key_id=self.profile_config['aws_access_key_id'],
+            aws_secret_access_key=self.profile_config['aws_secret_access_key'],
+            region_name=self.profile_config['region_name'],
         )
         response = client.get_session_token(
-            SerialNumber=self.role_config['mfa_serial_number'],
-            TokenCode=self.role_config['mfa_token_code'],
+            SerialNumber=self.profile_config['mfa_serial_number'],
+            TokenCode=self.profile_config['mfa_token_code'],
         )
         self.session_credentials = response['Credentials']
         self.session_credentials['LastUpdated'] = datetime.datetime.utcnow()
@@ -227,8 +227,8 @@ class State():
             aws_session_token=self.session_credentials['SessionToken'],
         )
         response = client.assume_role(
-            RoleArn=self.role_config['role_arn'],
-            RoleSessionName=self.role_config['role_session_name'],
+            RoleArn=self.profile_config['role_arn'],
+            RoleSessionName=self.profile_config['role_session_name'],
         )
         self.role_credentials = response['Credentials']
         self.role_credentials['LastUpdated'] = datetime.datetime.utcnow()
@@ -301,11 +301,11 @@ def server_stop(_request):
 def server_assume(request):
     try:
         state = State.get_instance()
-        role_config = request.json
-        state.role_config = role_config
+        profile_config = request.json
+        state.profile_config = profile_config
 
         if not state.is_session_valid():
-            if 'mfa_token_code' not in role_config:
+            if 'mfa_token_code' not in profile_config:
                 return pyramid.httpexceptions.HTTPBadRequest('MFA missing')
             state.update_session_credentials()
         state.update_role_credentials()
@@ -326,14 +326,14 @@ def client_assume(config, arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
     url = 'http://' + address + CONTROL_PATH % 'assume'
 
-    role_config = {}
-    role_config.update(config['default'])
-    role_config.update(config[arguments.profile])
+    profile_config = {}
+    profile_config.update(config['default'])
+    profile_config.update(config[arguments.profile])
 
-    response = requests.post(url, json=role_config)
+    response = requests.post(url, json=profile_config)
     if response.status_code == 400 and 'MFA missing' in response.text:
-        role_config['mfa_token_code'] = input('Enter MFA: ')
-        response = requests.post(url, json=role_config)
+        profile_config['mfa_token_code'] = input('Enter MFA: ')
+        response = requests.post(url, json=profile_config)
 
     if response.status_code != 200:
         print(response.text)
