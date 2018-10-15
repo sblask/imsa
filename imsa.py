@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 LOG_FORMAT = '%(asctime)s - %(levelname)5s - %(name)s - %(message)s'
 
+CONFIG_PATH = os.path.expanduser('~/.imsa')
+
 IP_ADDRESS = '169.254.169.254'
 INVALID_CREDENTIAL_PATH = '/latest/meta-data/iam/security-credentials'
 CREDENTIAL_PATH = INVALID_CREDENTIAL_PATH + '/'
@@ -41,7 +43,7 @@ def main():
 
 
 def __load_config():
-    with open(os.path.expanduser('~/.imsa'), 'r') as file_object:
+    with open(CONFIG_PATH, 'r') as file_object:
         return yaml.load(file_object)
 
 
