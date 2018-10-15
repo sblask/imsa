@@ -48,9 +48,9 @@ sudo ln -s /opt/imsa/bin/imsa /usr/bin
 
 The instance metadata service in EC2 is available at 169.254.169.254. So you
 need to get your machine to listen at 169.254.169.254 too. As you do not want
-to expose your AWS credentials to the outside(you still need to be careful with
-proxies and the like), you need to add the IP to your loopback device which
-restricts its availability to your machine. This can be done by editing
+to expose your AWS credentials to the outside, you need to add the IP to your
+loopback device which restricts its availability to your machine(you still need
+to be careful with proxies and the like). This can be done by editing
 `/etc/network/interfaces`. Assuming it looks like this:
 
 ```
