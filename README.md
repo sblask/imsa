@@ -16,6 +16,9 @@ drawback of this is that only one role/profile can be active at a time whereas
 normally you can provide different profiles whenever you run a command. Also
 see the [EC2 documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials).
 
+IMSA is inspired by [Limes](https://github.com/otm/limes) and aims at having a
+better architecture, simpler configuration and a lot less code.
+
 Usage
 -----
 
