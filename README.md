@@ -89,10 +89,33 @@ sudo systemctl start imsa.service
 Configuration
 -------------
 
-You configure `imsa assume` with a YAML file(see `imsa assume --help`). Each
-key in it is a profile that you can assume. If you want, you can provide a
-default section for default values like your access key. Otherwise, you might
-have to repeat configuration values. Example:
+IMSA is configured with a YAML file called `.imsa` located in your home
+directory. Only `imsa assume` reads this and then forwards configuration as
+necessary. Given the following example:
 
 ```yaml
+
+default:
+    aws_access_key_id: XXXXXXXXXXXXXXXXXXXX
+    aws_secret_access_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    role_session_name: SomeSessionName
+    mfa_serial_number: arn:aws:iam::XXXXXXXXXXXX:mfa/UserName
+    region_name: eu-west-1
+
+profile_one:
+    role_arn: arn:aws:iam::XXXXXXXXXXXX:role/RoleNameOne
+
+profile_two:
+    role_arn: arn:aws:iam::XXXXXXXXXXXX:role/RoleNameTwo
 ```
+
+you can assume `default`, `profile_one` and `profile_two`. The latter two use
+the values from `default` which is required. A profile can define any of the
+values in the example which will then override the ones from `default`. No
+sanity check is done, so you have to get the values right in **IAM** and then
+copy them from there.
+
+Note the [provider chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence)
+where instance metadata is the last provider in the chain. So all other
+providers have to be absent in order for IMSA to work.  Conversely, you can for
+example provide environment variables to temporarily use different credentials.
