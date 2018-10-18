@@ -265,9 +265,6 @@ def server_get_credentials(_request):
         error_message = exception.response['Error']['Message']
         logger.warning(error_message)
         return pyramid.httpexceptions.HTTPNotFound(error_message)
-    except Exception:
-        logger.exception('Error getting credentials')
-        return pyramid.httpexceptions.HTTPInternalServerError()
 
 
 def __make_response_dict(credentials):
@@ -290,13 +287,9 @@ def __format_datetime(datetime_object):
 @__register_route(CONTROL_PATH % 'stop')
 def server_stop(_request):
     logger.info('Stop server')
-    try:
-        server = State.get_instance().server
-        threading.Thread(target=server.shutdown).start()
-        return pyramid.response.Response()
-    except Exception:
-        logger.exception('Error stopping server')
-        return pyramid.httpexceptions.HTTPInternalServerError()
+    server = State.get_instance().server
+    threading.Thread(target=server.shutdown).start()
+    return pyramid.response.Response()
 
 
 @__register_route(CONTROL_PATH % 'assume')
@@ -312,15 +305,29 @@ def server_assume(request):
             state.update_session_credentials()
         state.update_role_credentials()
         return pyramid.response.Response()
-    except Exception:
-        logger.exception('Error assuming role')
-        return pyramid.httpexceptions.HTTPInternalServerError()
+    except botocore.exceptions.ParamValidationError as exception:
+        error_message = str(exception).replace('\n', ' ')
+        logger.warning(error_message)
+        return pyramid.response.Response(
+            error_message,
+            status=pyramid.httpexceptions.HTTPBadRequest.code,
+        )
+    except botocore.exceptions.ClientError as exception:
+        error_message = exception.response['Error']['Message']
+        logger.warning(error_message)
+        return pyramid.response.Response(
+            error_message,
+            status=pyramid.httpexceptions.HTTPBadRequest.code,
+        )
 
 
 @pyramid.view.exception_view_config(Exception)
 def server_exception(_exc, _request):
     logger.exception('Caught an exception that caused an internal server error')
-    return pyramid.httpexceptions.HTTPInternalServerError()
+    return pyramid.response.Response(
+        'Internal Server Error - Check log for details',
+        status=pyramid.httpexceptions.HTTPInternalServerError.code,
+    )
 
 
 def client_stop(arguments):
