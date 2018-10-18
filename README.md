@@ -89,6 +89,24 @@ sudo systemctl restart networking.service
 sudo systemctl start imsa.service
 ```
 
+Completions are available through
+[argcomplete](https://pypi.org/project/argcomplete/) so you can do:
+
+```
+eval "$(/opt/imsa/bin/register-python-argcomplete imsa)"
+```
+
+to get completions to work for your current shell session or you can pipe the
+output of:
+
+```
+/opt/imsa/bin/register-python-argcomplete imsa
+```
+
+into a file that you source from your shell rc file. See
+[argcomplete](https://pypi.org/project/argcomplete/) for more details.
+
+
 Configuration
 -------------
 
