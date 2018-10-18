@@ -126,6 +126,8 @@ def server_start(arguments):
         __configure_logging(arguments)
         with pyramid.config.Configurator() as config:
             __discover_routes(config)
+            # configure exception_view_config
+            config.scan()
             app = config.make_wsgi_app()
 
         logger.info('Start server')
@@ -313,6 +315,12 @@ def server_assume(request):
     except Exception:
         logger.exception('Error assuming role')
         return pyramid.httpexceptions.HTTPInternalServerError()
+
+
+@pyramid.view.exception_view_config(Exception)
+def server_exception(_exc, _request):
+    logger.exception('Caught an exception that caused an internal server error')
+    return pyramid.httpexceptions.HTTPInternalServerError()
 
 
 def client_stop(arguments):
