@@ -22,7 +22,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
-LOG_FORMAT = '%(asctime)s - %(levelname)5s - %(name)s - %(message)s'
+LOG_FORMAT = '%(asctime)s - %(levelname)7s - %(name)s - %(message)s'
 
 CONFIG_PATH = os.path.expanduser('~/.imsa')
 
