@@ -121,7 +121,6 @@ default:
     aws_secret_access_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     role_session_name: SomeSessionName
     mfa_serial_number: arn:aws:iam::XXXXXXXXXXXX:mfa/UserName
-    region_name: eu-west-1
 
 profile_one:
     role_arn: arn:aws:iam::XXXXXXXXXXXX:role/RoleNameOne

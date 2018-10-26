@@ -211,7 +211,6 @@ class State():
             'sts',
             aws_access_key_id=self.profile_config['aws_access_key_id'],
             aws_secret_access_key=self.profile_config['aws_secret_access_key'],
-            region_name=self.profile_config['region_name'],
         )
         response = client.get_session_token(
             SerialNumber=self.profile_config['mfa_serial_number'],
