@@ -259,14 +259,14 @@ def server_get_credentials(_request):
         credentials = state.role_credentials or state.session_credentials
         if not credentials:
             return pyramid.httpexceptions.HTTPNotFound('No role assumed')
-        return pyramid.response.Response(json=__make_response_dict(credentials))
+        return pyramid.response.Response(json=__response_dict(credentials))
     except botocore.exceptions.ClientError as exception:
         error_message = exception.response['Error']['Message']
         logger.warning(error_message)
         return pyramid.httpexceptions.HTTPNotFound(error_message)
 
 
-def __make_response_dict(credentials):
+def __response_dict(credentials):
     return {
         'AccessKeyId': credentials['AccessKeyId'],
         'Code': 'Success',
@@ -322,7 +322,7 @@ def server_assume(request):
 
 @pyramid.view.exception_view_config(Exception)
 def server_exception(_exc, _request):
-    logger.exception('Caught an exception that caused an internal server error')
+    logger.exception('An exception caused an internal server error')
     return pyramid.response.Response(
         'Internal Server Error - Check log for details',
         status=pyramid.httpexceptions.HTTPInternalServerError.code,
