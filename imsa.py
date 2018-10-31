@@ -25,6 +25,16 @@ logger = logging.getLogger(__name__)
 LOG_FORMAT = '%(asctime)s - %(levelname)7s - %(name)s - %(message)s'
 
 CONFIG_PATH = os.path.expanduser('~/.imsa')
+CONFIG_KEYS_REQUIRING_SESSION_UPDATE = (
+    'aws_access_key_id',
+    'aws_secret_access_key',
+    'mfa_serial_number',
+)
+CONFIG_KEYS_REQUIRING_ASSUME_ROLE = (
+    'role_arn',
+    'role_session_name',
+)
+
 
 IP_ADDRESS = '169.254.169.254'
 INVALID_CREDENTIAL_PATH = '/latest/meta-data/iam/security-credentials'
@@ -176,11 +186,49 @@ def __discover_routes(config):
             config.add_view(object_, route_name=name)
 
 
+def have_credentials_expired(credentials):
+    now = datetime.datetime.utcnow()
+    soon = now + datetime.timedelta(minutes=MINIMUM_MINUTES_IN_SESSION)
+    expiration = credentials['Expiration'].replace(tzinfo=None)
+    return expiration < soon
+
+
+def get_new_session_credentials(config):
+    client = boto3.client(
+        'sts',
+        aws_access_key_id=config['aws_access_key_id'],
+        aws_secret_access_key=config['aws_secret_access_key'],
+    )
+    response = client.get_session_token(
+        SerialNumber=config['mfa_serial_number'],
+        TokenCode=config['mfa_token_code'],
+    )
+    credentials = response['Credentials']
+    credentials['LastUpdated'] = datetime.datetime.utcnow()
+    return credentials
+
+
+def get_new_role_credentials(session_credentials, config):
+    client = boto3.client(
+        'sts',
+        aws_access_key_id=session_credentials['AccessKeyId'],
+        aws_secret_access_key=session_credentials['SecretAccessKey'],
+        aws_session_token=session_credentials['SessionToken'],
+    )
+    response = client.assume_role(
+        RoleArn=config['role_arn'],
+        RoleSessionName=config['role_session_name'],
+    )
+    credentials = response['Credentials']
+    credentials['LastUpdated'] = datetime.datetime.utcnow()
+    return credentials
+
+
 class State():
 
     def __init__(self):
         self.server = None
-        self.profile_config = {}
+        self.__config = {}
         self.session_credentials = {}
         self.role_credentials = {}
 
@@ -190,55 +238,52 @@ class State():
             cls.instance = State()
         return cls.instance
 
-    def is_session_valid(self):
-        if not self.session_credentials:
-            return False
+    def requires_mfa(self, new_config):
+        return self.__new_session_credentials_required(new_config)
 
-        if self.__have_credentials_expired(self.session_credentials):
-            return False
-
-        return True
-
-    def __have_credentials_expired(self, credentials):
-        now = datetime.datetime.utcnow()
-        soon = now + datetime.timedelta(minutes=MINIMUM_MINUTES_IN_SESSION)
-        expiration = credentials['Expiration'].replace(tzinfo=None)
-        return expiration < soon
-
-    def update_session_credentials(self):
-        logger.info('Update session credentials')
-        client = boto3.client(
-            'sts',
-            aws_access_key_id=self.profile_config['aws_access_key_id'],
-            aws_secret_access_key=self.profile_config['aws_secret_access_key'],
-        )
-        response = client.get_session_token(
-            SerialNumber=self.profile_config['mfa_serial_number'],
-            TokenCode=self.profile_config['mfa_token_code'],
-        )
-        self.session_credentials = response['Credentials']
-        self.session_credentials['LastUpdated'] = datetime.datetime.utcnow()
-
-    def update_role_credentials(self):
-        logger.info('Update role credentials')
-        client = boto3.client(
-            'sts',
-            aws_access_key_id=self.session_credentials['AccessKeyId'],
-            aws_secret_access_key=self.session_credentials['SecretAccessKey'],
-            aws_session_token=self.session_credentials['SessionToken'],
-        )
-        response = client.assume_role(
-            RoleArn=self.profile_config['role_arn'],
-            RoleSessionName=self.profile_config['role_session_name'],
-        )
-        self.role_credentials = response['Credentials']
-        self.role_credentials['LastUpdated'] = datetime.datetime.utcnow()
+    def update_credentials(self, new_config):
+        session_updated = False
+        if self.__new_session_credentials_required(new_config):
+            logger.info('Update session credentials')
+            self.session_credentials = get_new_session_credentials(new_config)
+            session_updated = True
+        if session_updated or self.__new_role_credentials_required(new_config):
+            logger.info('Update role credentials')
+            self.role_credentials = get_new_role_credentials(
+                self.session_credentials,
+                new_config,
+            )
+        self.__config = new_config
 
     def maybe_update_role_credentials(self):
-        if not self.role_credentials:
-            return
-        if self.__have_credentials_expired(self.role_credentials):
-            self.update_role_credentials()
+        if self.__new_role_credentials_required(self.__config):
+            logger.info('Update role credentials')
+            self.role_credentials = get_new_role_credentials(
+                self.session_credentials,
+                self.__config,
+            )
+
+    def __new_session_credentials_required(self, new_config):
+        if not self.session_credentials:
+            return True
+        if have_credentials_expired(self.session_credentials):
+            return True
+        for key in CONFIG_KEYS_REQUIRING_SESSION_UPDATE:
+            if new_config[key] != self.__config[key]:
+                return True
+        return False
+
+    def __new_role_credentials_required(self, new_config):
+        for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+            if key not in new_config:
+                logger.info('No %s in given config', key)
+                return False
+        if have_credentials_expired(self.role_credentials):
+            return True
+        for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+            if new_config[key] != self.__config[key]:
+                return True
+        return False
 
 
 @__register_route(INVALID_CREDENTIAL_PATH)
@@ -295,14 +340,12 @@ def server_stop(_request):
 def server_assume(request):
     try:
         state = State.get_instance()
-        profile_config = request.json
-        state.profile_config = profile_config
+        config = request.json
 
-        if not state.is_session_valid():
-            if 'mfa_token_code' not in profile_config:
-                return pyramid.httpexceptions.HTTPBadRequest('MFA missing')
-            state.update_session_credentials()
-        state.update_role_credentials()
+        if state.requires_mfa(config) and 'mfa_token_code' not in config:
+            return pyramid.httpexceptions.HTTPBadRequest('MFA missing')
+
+        state.update_credentials(config)
         return pyramid.response.Response()
     except botocore.exceptions.ParamValidationError as exception:
         error_message = str(exception).replace('\n', ' ')
