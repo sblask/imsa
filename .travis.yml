@@ -2,8 +2,10 @@ language: python
 python: 3.5
 
 install:
+  - pip install pycodestyle
   - pip install pylint
   - pip install --requirement requirements.txt
 script:
+  - pycodestyle imsa.py imsa_test.py
   - pylint imsa.py imsa_test.py
   - python imsa_test.py
