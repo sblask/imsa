@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/sblask/imsa.svg?branch=master)](https://travis-ci.org/sblask/imsa)
+
 IMSA (Instance Metadata Service for Authentication)
 ===================================================
 
