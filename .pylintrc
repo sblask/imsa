@@ -1,0 +1,5 @@
+[BASIC]
+const-rgx=(([A-Z_][A-Z0-9_]{2,30})|logger)$
+
+[MESSAGES CONTROL]
+disable=broad-except,missing-docstring
