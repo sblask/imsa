@@ -2,4 +2,4 @@
 const-rgx=(([A-Z_][A-Z0-9_]{2,40})|logger)$
 
 [MESSAGES CONTROL]
-disable=broad-except,missing-docstring
+disable=broad-except,missing-docstring,no-else-return
