@@ -35,6 +35,22 @@ class StateTests(unittest.TestCase):
 
     @unittest.mock.patch('imsa.get_new_role_credentials')
     @unittest.mock.patch('imsa.get_new_session_credentials')
+    def test_no_role(self, get_session_mock, get_role_mock):
+        get_session_mock.return_value = SAMPLE_CREDENTIALS
+        get_role_mock.return_value = SAMPLE_CREDENTIALS
+
+        config_without_role = {}
+        for key in imsa.CONFIG_KEYS_REQUIRING_SESSION_UPDATE:
+            config_without_role[key] = SAMPLE_CONFIG[key]
+
+        assert not self.state.requires_mfa(config_without_role)
+
+        self.state.update_credentials(config_without_role)
+        assert get_session_mock.called
+        assert not get_role_mock.called
+
+    @unittest.mock.patch('imsa.get_new_role_credentials')
+    @unittest.mock.patch('imsa.get_new_session_credentials')
     def test_require_mfa(self, get_session_mock, get_role_mock):
         get_session_mock.return_value = SAMPLE_CREDENTIALS
         get_role_mock.return_value = SAMPLE_CREDENTIALS

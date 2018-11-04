@@ -239,7 +239,7 @@ class State():
         return cls.instance
 
     def requires_mfa(self, new_config):
-        return self.__new_session_credentials_required(new_config)
+        return self.__new_role_credentials_required(new_config)
 
     def update_credentials(self, new_config):
         session_updated = False
@@ -247,7 +247,8 @@ class State():
             logger.info('Update session credentials')
             self.session_credentials = get_new_session_credentials(new_config)
             session_updated = True
-        if session_updated or self.__new_role_credentials_required(new_config):
+        if self.role_credentials and session_updated or \
+                self.__new_role_credentials_required(new_config):
             logger.info('Update role credentials')
             self.role_credentials = get_new_role_credentials(
                 self.session_credentials,
@@ -274,16 +275,19 @@ class State():
         return False
 
     def __new_role_credentials_required(self, new_config):
-        for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
-            if key not in new_config:
-                logger.info('No %s in given config', key)
-                return False
-        if have_credentials_expired(self.role_credentials):
+        if not self.role_credentials:
+            for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+                if key not in new_config:
+                    logger.info('No %s in given config', key)
+                    return False
             return True
-        for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
-            if new_config[key] != self.__config[key]:
+        else:
+            if have_credentials_expired(self.role_credentials):
                 return True
-        return False
+            for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+                if new_config[key] != self.__config[key]:
+                    return True
+            return False
 
 
 @__register_route(INVALID_CREDENTIAL_PATH)
