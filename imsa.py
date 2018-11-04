@@ -229,8 +229,8 @@ class State():
     def __init__(self):
         self.server = None
         self.__config = {}
-        self.session_credentials = {}
-        self.role_credentials = {}
+        self.__session_credentials = {}
+        self.__role_credentials = {}
 
     @classmethod
     def get_instance(cls):
@@ -241,17 +241,20 @@ class State():
     def requires_mfa(self, new_config):
         return self.__new_role_credentials_required(new_config)
 
+    def get_credentials(self):
+        return self.__role_credentials or self.__session_credentials
+
     def update_credentials(self, new_config):
         session_updated = False
         if self.__new_session_credentials_required(new_config):
             logger.info('Update session credentials')
-            self.session_credentials = get_new_session_credentials(new_config)
+            self.__session_credentials = get_new_session_credentials(new_config)
             session_updated = True
-        if self.role_credentials and session_updated or \
+        if self.__role_credentials and session_updated or \
                 self.__new_role_credentials_required(new_config):
             logger.info('Update role credentials')
-            self.role_credentials = get_new_role_credentials(
-                self.session_credentials,
+            self.__role_credentials = get_new_role_credentials(
+                self.__session_credentials,
                 new_config,
             )
         self.__config = new_config
@@ -259,15 +262,15 @@ class State():
     def maybe_update_role_credentials(self):
         if self.__new_role_credentials_required(self.__config):
             logger.info('Update role credentials')
-            self.role_credentials = get_new_role_credentials(
-                self.session_credentials,
+            self.__role_credentials = get_new_role_credentials(
+                self.__session_credentials,
                 self.__config,
             )
 
     def __new_session_credentials_required(self, new_config):
-        if not self.session_credentials:
+        if not self.__session_credentials:
             return True
-        if have_credentials_expired(self.session_credentials):
+        if have_credentials_expired(self.__session_credentials):
             return True
         for key in CONFIG_KEYS_REQUIRING_SESSION_UPDATE:
             if new_config[key] != self.__config[key]:
@@ -275,14 +278,14 @@ class State():
         return False
 
     def __new_role_credentials_required(self, new_config):
-        if not self.role_credentials:
+        if not self.__role_credentials:
             for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
                 if key not in new_config:
                     logger.info('No %s in given config', key)
                     return False
             return True
         else:
-            if have_credentials_expired(self.role_credentials):
+            if have_credentials_expired(self.__role_credentials):
                 return True
             for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
                 if new_config[key] != self.__config[key]:
@@ -305,7 +308,7 @@ def server_get_credentials(_request):
     try:
         state = State.get_instance()
         state.maybe_update_role_credentials()
-        credentials = state.role_credentials or state.session_credentials
+        credentials = state.get_credentials()
         if not credentials:
             return pyramid.httpexceptions.HTTPNotFound('No role assumed')
         return pyramid.response.Response(json=__response_dict(credentials))
