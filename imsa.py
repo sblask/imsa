@@ -248,7 +248,8 @@ class State():
         session_updated = False
         if self.__new_session_credentials_required(new_config):
             logger.info('Update session credentials')
-            self.__session_credentials = get_new_session_credentials(new_config)
+            self.__session_credentials = \
+                get_new_session_credentials(new_config)
             session_updated = True
         if self.__role_credentials and session_updated or \
                 self.__new_role_credentials_required(new_config):
