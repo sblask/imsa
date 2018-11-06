@@ -187,6 +187,8 @@ def __discover_routes(config):
 
 
 def have_credentials_expired(credentials):
+    if not credentials:
+        return False
     now = datetime.datetime.utcnow()
     soon = now + datetime.timedelta(minutes=MINIMUM_MINUTES_IN_SESSION)
     expiration = credentials['Expiration'].replace(tzinfo=None)
@@ -245,23 +247,53 @@ class State():
         return self.__role_credentials or self.__session_credentials
 
     def update_credentials(self, new_config):
-        session_updated = False
-        if self.__new_session_credentials_required(new_config):
-            logger.info('Update session credentials')
-            self.__session_credentials = \
-                get_new_session_credentials(new_config)
-            session_updated = True
-        if self.__role_credentials and session_updated or \
-                self.__new_role_credentials_required(new_config):
-            logger.info('Update role credentials')
-            self.__role_credentials = get_new_role_credentials(
-                self.__session_credentials,
-                new_config,
-            )
+        new_session_credentials, new_role_credentials = \
+            self.__get_credentials(new_config)
+
+        if new_session_credentials is not None:
+            self.__session_credentials = new_session_credentials
+
+        if new_role_credentials is not None:
+            self.__role_credentials = new_role_credentials
+
         self.__config = new_config
 
-    def maybe_update_role_credentials(self):
-        if self.__new_role_credentials_required(self.__config):
+    def __get_credentials(self, new_config):
+        new_session_credentials = None
+        if self.__new_session_credentials_required(new_config):
+            logger.info('Update session credentials')
+            new_session_credentials = get_new_session_credentials(new_config)
+
+        new_role_credentials = self.__get_role_credentials(
+            new_config,
+            new_session_credentials,
+        )
+        return new_session_credentials, new_role_credentials
+
+    def __get_role_credentials(self, new_config, new_session_credentials):
+        if self.__role_credentials and new_session_credentials:
+            logger.info('Session updated, update role credentials')
+            return get_new_role_credentials(
+                new_session_credentials,
+                new_config,
+            )
+        if have_credentials_expired(self.__role_credentials):
+            logger.info('Role credentials have expired')
+            return get_new_role_credentials(
+                new_session_credentials or self.__session_credentials,
+                new_config,
+            )
+        if self.__new_role_credentials_required(new_config):
+            logger.info('Config requires new role credentials')
+            return get_new_role_credentials(
+                new_session_credentials or self.__session_credentials,
+                new_config,
+            )
+        logger.info('Reset new role credentials')
+        return {}
+
+    def update_role_credentials_if_expired(self):
+        if have_credentials_expired(self.__role_credentials):
             logger.info('Update role credentials')
             self.__role_credentials = get_new_role_credentials(
                 self.__session_credentials,
@@ -289,6 +321,9 @@ class State():
             if have_credentials_expired(self.__role_credentials):
                 return True
             for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+                if key not in new_config:
+                    logger.info('No %s in given config', key)
+                    return False
                 if new_config[key] != self.__config[key]:
                     return True
             return False
@@ -308,7 +343,7 @@ def server_get_role_two(_request):
 def server_get_credentials(_request):
     try:
         state = State.get_instance()
-        state.maybe_update_role_credentials()
+        state.update_role_credentials_if_expired()
         credentials = state.get_credentials()
         if not credentials:
             return pyramid.httpexceptions.HTTPNotFound('No role assumed')
