@@ -187,6 +187,8 @@ def __discover_routes(config):
 
 
 def have_credentials_expired(credentials):
+    if not credentials:
+        return False
     now = datetime.datetime.utcnow()
     soon = now + datetime.timedelta(minutes=MINIMUM_MINUTES_IN_SESSION)
     expiration = credentials['Expiration'].replace(tzinfo=None)
@@ -245,23 +247,47 @@ class State():
         return self.__role_credentials or self.__session_credentials
 
     def update_credentials(self, new_config):
-        session_updated = False
+        new_session_credentials, new_role_credentials = \
+            self.__get_credentials(new_config)
+
+        if new_session_credentials is not None:
+            self.__session_credentials = new_session_credentials
+
+        if new_role_credentials is not None:
+            self.__role_credentials = new_role_credentials
+
+        self.__config = new_config
+
+    def __get_credentials(self, new_config):
+        new_session_credentials = None
+        new_role_credentials = None
         if self.__new_session_credentials_required(new_config):
             logger.info('Update session credentials')
-            self.__session_credentials = \
-                get_new_session_credentials(new_config)
-            session_updated = True
-        if self.__role_credentials and session_updated or \
-                self.__new_role_credentials_required(new_config):
+            new_session_credentials = get_new_session_credentials(new_config)
+        if self.__role_credentials and new_session_credentials:
             logger.info('Update role credentials')
-            self.__role_credentials = get_new_role_credentials(
+            new_role_credentials = get_new_role_credentials(
+                new_session_credentials,
+                new_config,
+            )
+        if have_credentials_expired(self.__role_credentials):
+            logger.info('Update role credentials')
+            new_role_credentials = get_new_role_credentials(
                 self.__session_credentials,
                 new_config,
             )
-        self.__config = new_config
+        if self.__new_role_credentials_required(new_config):
+            logger.info('Update role credentials')
+            new_role_credentials = get_new_role_credentials(
+                self.__session_credentials,
+                new_config,
+            )
+        else:
+            new_role_credentials = {}
+        return new_session_credentials, new_role_credentials
 
     def maybe_update_role_credentials(self):
-        if self.__new_role_credentials_required(self.__config):
+        if have_credentials_expired(self.__role_credentials):
             logger.info('Update role credentials')
             self.__role_credentials = get_new_role_credentials(
                 self.__session_credentials,
@@ -289,6 +315,9 @@ class State():
             if have_credentials_expired(self.__role_credentials):
                 return True
             for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+                if key not in new_config:
+                    logger.info('No %s in given config', key)
+                    return False
                 if new_config[key] != self.__config[key]:
                     return True
             return False
