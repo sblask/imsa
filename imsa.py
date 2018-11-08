@@ -271,25 +271,21 @@ class State():
         return new_session_credentials, new_role_credentials
 
     def __get_role_credentials(self, new_config, new_session_credentials):
+        new_role_credentials = functools.partial(
+            get_new_role_credentials,
+            new_session_credentials or self.__session_credentials,
+            new_config,
+        )
         if self.__role_credentials and new_session_credentials:
             logger.info('Session updated, update role credentials')
-            return get_new_role_credentials(
-                new_session_credentials,
-                new_config,
-            )
+            return new_role_credentials()
         if have_credentials_expired(self.__role_credentials):
             logger.info('Role credentials have expired')
-            return get_new_role_credentials(
-                new_session_credentials or self.__session_credentials,
-                new_config,
-            )
+            return new_role_credentials()
         if self.__new_role_credentials_required(new_config):
             logger.info('Config requires new role credentials')
-            return get_new_role_credentials(
-                new_session_credentials or self.__session_credentials,
-                new_config,
-            )
-        logger.info('Reset new role credentials')
+            return new_role_credentials()
+        logger.info('No role credentials required')
         return {}
 
     def update_role_credentials_if_expired(self):
