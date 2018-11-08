@@ -426,10 +426,7 @@ def client_assume(config, arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
     url = 'http://' + address + CONTROL_PATH % 'assume'
 
-    profile_config = {}
-    profile_config.update(config['default'])
-    profile_config.update(config[arguments.profile])
-
+    profile_config = _get_profile_config(config, arguments.profile)
     response = requests.post(url, json=profile_config)
     if response.status_code == 400 and 'MFA missing' in response.text:
         profile_config['mfa_token_code'] = input('Enter MFA: ')
@@ -437,6 +434,20 @@ def client_assume(config, arguments):
 
     if response.status_code != 200:
         print(response.text)
+
+
+def _get_profile_config(config, profile_name):
+    profile_config = config[profile_name]
+    if 'extends' in profile_config:
+        extended_config = _get_profile_config(
+            config,
+            profile_config['extends'],
+        )
+        extended_config.update(profile_config)
+        del extended_config['extends']
+        return extended_config
+    else:
+        return profile_config
 
 
 if __name__ == '__main__':

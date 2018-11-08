@@ -118,24 +118,27 @@ necessary. Given the following example:
 
 ```yaml
 
-default:
+some_base_profile:
     aws_access_key_id: XXXXXXXXXXXXXXXXXXXX
     aws_secret_access_key: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     role_session_name: SomeSessionName
     mfa_serial_number: arn:aws:iam::XXXXXXXXXXXX:mfa/UserName
 
 profile_one:
+    extends: some_base_profile
     role_arn: arn:aws:iam::XXXXXXXXXXXX:role/RoleNameOne
 
 profile_two:
+    extends: some_base_profile
+    role_session_name: SomeOtherSessionName
     role_arn: arn:aws:iam::XXXXXXXXXXXX:role/RoleNameTwo
 ```
 
-you can assume `default`, `profile_one` and `profile_two`. The latter two use
-the values from `default` which is required. A profile can define any of the
-values in the example which will then override the ones from `default`. No
-sanity check is done, so you have to get the values right in **IAM** and then
-copy them from there.
+You can assume `some_base_profile`, `profile_one` and `profile_two`. The latter
+two extend `some_base_profile` which means that they use the values from
+`some_base_profile` that they don't override. A profile can define any of the
+values in the example. No sanity check is done, so you have to get the values
+right in **IAM** and then copy them from there.
 
 Note the [provider chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence)
 where instance metadata is the last provider in the chain. So all other

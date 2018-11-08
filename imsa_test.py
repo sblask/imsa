@@ -203,5 +203,66 @@ class StateTests(unittest.TestCase):
         assert get_role_mock.called
 
 
+class ConfigTests(unittest.TestCase):
+    # pylint: disable=protected-access
+
+    def test_simple_config(self):
+        config = {
+            'profile_one': {
+                'key_one': 'foo',
+                'key_two': 'bar',
+            },
+        }
+        self.assertDictEqual(
+            imsa._get_profile_config(config, 'profile_one'),
+            {
+                'key_one': 'foo',
+                'key_two': 'bar',
+            }
+        )
+
+    def test_simple_extends(self):
+        config = {
+            'profile_one': {
+                'key_one': 'foo',
+                'key_two': 'bar',
+            },
+            'profile_two': {
+                'extends': 'profile_one',
+                'key_one': 'foobar',
+            },
+        }
+        self.assertDictEqual(
+            imsa._get_profile_config(config, 'profile_two'),
+            {
+                'key_one': 'foobar',
+                'key_two': 'bar',
+            }
+        )
+
+    def test_extends_config(self):
+        config = {
+            'profile_one': {
+                'key_one': 'foo',
+                'key_two': 'bar',
+            },
+            'profile_two': {
+                'extends': 'profile_one',
+                'key_one': 'foobar',
+            },
+            'profile_three': {
+                'extends': 'profile_two',
+                'key_two': 'barfoo',
+            },
+        }
+        self.assertDictEqual(
+            imsa._get_profile_config(config, 'profile_three'),
+            {
+                'key_one': 'foobar',
+                'key_two': 'barfoo',
+            }
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
