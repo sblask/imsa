@@ -242,7 +242,7 @@ class State():
         return cls.instance
 
     def requires_mfa(self, new_config):
-        return self.__new_role_credentials_required(new_config)
+        return self.__new_session_credentials_required(new_config)
 
     def get_credentials(self):
         return self.__role_credentials or self.__session_credentials
