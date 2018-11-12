@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 LOG_FORMAT = '%(asctime)s - %(levelname)7s - %(name)s - %(message)s'
+SERVER_LOG_MAX_BYTES = 5 * 1024 * 1024
 
 CONFIG_PATH = os.path.expanduser('~/.imsa')
 CONFIG_KEYS_REQUIRING_SESSION_UPDATE = (
@@ -158,7 +159,7 @@ def __configure_logging(arguments):
     if arguments.log_file:
         handler = logging.handlers.RotatingFileHandler(
             arguments.log_file,
-            maxBytes=5120,
+            maxBytes=SERVER_LOG_MAX_BYTES,
             backupCount=5,
         )
         handlers = [handler]
