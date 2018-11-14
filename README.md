@@ -55,8 +55,10 @@ The instance metadata service in EC2 is available at 169.254.169.254. So you
 need to get your machine to listen at 169.254.169.254 too. As you do not want
 to expose your AWS credentials to the outside, you need to add the IP to your
 loopback device which restricts its availability to your machine(you still need
-to be careful with proxies and the like). This can be done by editing
-`/etc/network/interfaces`. Assuming it looks like this:
+to be careful with proxies and the like). This can be done in Linux(a way to
+make this work in Mac OS is described
+[here](https://blog.felipe-alfaro.com/2017/03/22/persistent-loopback-interfaces-in-mac-os-x/))
+by editing `/etc/network/interfaces`. Assuming it looks like this:
 
 ```
 auto lo
