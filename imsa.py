@@ -213,10 +213,13 @@ def get_new_session_credentials(config):
         aws_access_key_id=config['aws_access_key_id'],
         aws_secret_access_key=config['aws_secret_access_key'],
     )
-    response = client.get_session_token(
-        SerialNumber=config['mfa_serial_number'],
-        TokenCode=config['mfa_token_code'],
-    )
+    if 'mfa_serial_number' in config and 'mfa_token_code' in config:
+        response = client.get_session_token(
+            SerialNumber=config['mfa_serial_number'],
+            TokenCode=config['mfa_token_code'],
+        )
+    else:
+        response = client.get_session_token()
     credentials = response['Credentials']
     credentials['LastUpdated'] = datetime.datetime.utcnow()
     return credentials
