@@ -200,6 +200,39 @@ class StateTests(unittest.TestCase):
         assert get_session_mock.called
         assert get_role_mock.called
 
+    @unittest.mock.patch('imsa.get_new_role_credentials')
+    @unittest.mock.patch('imsa.get_new_session_credentials')
+    def test_no_mfa(self, get_session_mock, get_role_mock):
+        get_session_mock.return_value = SAMPLE_CREDENTIALS_SESSION
+        get_role_mock.return_value = SAMPLE_CREDENTIALS_ROLE
+
+        config = dict(SAMPLE_CONFIG)
+        del config['mfa_serial_number']
+
+        assert not self.state.requires_mfa(config)
+
+        self.state.update_credentials(config)
+        self.assert_access_key(ACCESS_KEY_ROLE)
+
+        assert get_session_mock.called
+        assert get_role_mock.called
+
+        get_session_mock.reset_mock()
+        get_role_mock.reset_mock()
+
+        assert not self.state.requires_mfa(config)
+
+        self.state.update_credentials(config)
+        self.assert_access_key(ACCESS_KEY_ROLE)
+
+        assert not get_session_mock.called
+        assert not get_role_mock.called
+
+        for key in config:
+            config[key] = 'new_value'
+            assert not self.state.requires_mfa(config)
+            self.state.update_credentials(config)
+
 
 class ConfigTests(unittest.TestCase):
     # pylint: disable=protected-access

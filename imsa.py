@@ -259,6 +259,8 @@ class State():
         return {'assumed_profile': self.__config.get('profile_name', None)}
 
     def requires_mfa(self, new_config):
+        if 'mfa_serial_number' not in new_config:
+            return False
         return self.__new_session_credentials_required(new_config)
 
     def get_credentials(self):
@@ -282,13 +284,13 @@ class State():
             logger.info('Update session credentials')
             new_session_credentials = get_new_session_credentials(new_config)
 
-        new_role_credentials = self.__get_role_credentials(
+        new_role_credentials = self.__get_new_role_credentials(
             new_config,
             new_session_credentials,
         )
         return new_session_credentials, new_role_credentials
 
-    def __get_role_credentials(self, new_config, new_session_credentials):
+    def __get_new_role_credentials(self, new_config, new_session_credentials):
         if self.__role_credentials and new_session_credentials:
             logger.info('Session updated, update role credentials')
             return get_new_role_credentials(
@@ -307,8 +309,13 @@ class State():
                 new_session_credentials or self.__session_credentials,
                 new_config,
             )
-        logger.info('Reset new role credentials')
-        return {}
+
+        if 'role_arn' in new_config:
+            logger.info('Role is configured but no update is necessary')
+            return None
+        else:
+            logger.info('Reset new role credentials')
+            return {}
 
     def update_role_credentials_if_expired(self):
         if have_credentials_expired(self.__role_credentials):
@@ -324,7 +331,7 @@ class State():
         if have_credentials_expired(self.__session_credentials):
             return True
         for key in CONFIG_KEYS_REQUIRING_SESSION_UPDATE:
-            if new_config[key] != self.__config[key]:
+            if new_config.get(key, None) != self.__config.get(key, None):
                 return True
         return False
 
@@ -342,7 +349,7 @@ class State():
                 if key not in new_config:
                     logger.info('No %s in given config', key)
                     return False
-                if new_config[key] != self.__config[key]:
+                if new_config.get(key, None) != self.__config.get(key, None):
                     return True
             return False
 
