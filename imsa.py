@@ -17,6 +17,7 @@ import pyramid.config
 import pyramid.response
 import pyramid.view
 import requests
+import requests.exceptions
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -446,6 +447,16 @@ def server_exception(_exc, _request):
     )
 
 
+def __handle_server_unreachable(function):
+    def wrapper(*args, **kwargs):
+        try:
+            function(*args, **kwargs)
+        except requests.exceptions.ConnectionError:
+            print('IMSA server could not be reached')
+    return wrapper
+
+
+@__handle_server_unreachable
 def client_stop(arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
     requests.post(
@@ -453,6 +464,7 @@ def client_stop(arguments):
     )
 
 
+@__handle_server_unreachable
 def client_assume(config, arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
     url = 'http://' + address + CONTROL_PATH_ASSUME
@@ -483,6 +495,7 @@ def _get_profile_config(config, profile_name):
         return profile_config
 
 
+@__handle_server_unreachable
 def client_status(arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
     url = 'http://' + address + CONTROL_PATH_STATUS
