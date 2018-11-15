@@ -41,7 +41,11 @@ IP_ADDRESS = '169.254.169.254'
 INVALID_CREDENTIAL_PATH = '/latest/meta-data/iam/security-credentials'
 CREDENTIAL_PATH = INVALID_CREDENTIAL_PATH + '/'
 DUMMY_ROLE = 'imsa'
+
 CONTROL_PATH = '/__imsa/%s/'
+CONTROL_PATH_ASSUME = CONTROL_PATH % 'assume'
+CONTROL_PATH_STOP = CONTROL_PATH % 'stop'
+CONTROL_PATH_STATUS = CONTROL_PATH % 'status'
 
 MINIMUM_MINUTES_IN_SESSION = 5
 
@@ -69,6 +73,7 @@ def __get_arguments():
     __add_start_parser(subparsers)
     __add_stop_parser(subparsers)
     __add_assume_parser(subparsers)
+    __add_status_parser(subparsers)
 
     argcomplete.autocomplete(parser)
     return parser.parse_args()
@@ -111,6 +116,12 @@ def __add_assume_parser(parser):
 
     # need to add this completer as choices is not available during completion
     profile_argument.completer = __profile_completer
+
+
+def __add_status_parser(parser):
+    status_parser = parser.add_parser('status')
+    status_parser.set_defaults(function=client_status)
+    __add_common_arguments(status_parser)
 
 
 def __profile_completer(**_kwargs):
@@ -240,6 +251,9 @@ class State():
         if not hasattr(cls, 'instance'):
             cls.instance = State()
         return cls.instance
+
+    def get_status(self):
+        return {'assumed_profile': self.__config.get('profile_name', None)}
 
     def requires_mfa(self, new_config):
         return self.__new_session_credentials_required(new_config)
@@ -372,7 +386,7 @@ def __format_datetime(datetime_object):
     return cleaned.isoformat('T') + 'Z'
 
 
-@__register_route(CONTROL_PATH % 'stop')
+@__register_route(CONTROL_PATH_STOP)
 def server_stop(_request):
     logger.info('Stop server')
     server = State.get_instance().server
@@ -380,7 +394,7 @@ def server_stop(_request):
     return pyramid.response.Response()
 
 
-@__register_route(CONTROL_PATH % 'assume')
+@__register_route(CONTROL_PATH_ASSUME)
 def server_assume(request):
     try:
         state = State.get_instance()
@@ -407,6 +421,12 @@ def server_assume(request):
         )
 
 
+@__register_route(CONTROL_PATH_STATUS)
+def server_status(_request):
+    status = State.get_instance().get_status()
+    return pyramid.response.Response(json=status)
+
+
 @pyramid.view.exception_view_config(Exception)
 def server_exception(_exc, _request):
     logger.exception('An exception caused an internal server error')
@@ -419,15 +439,17 @@ def server_exception(_exc, _request):
 def client_stop(arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
     requests.post(
-        'http://' + address + CONTROL_PATH % 'stop',
+        'http://' + address + CONTROL_PATH_STOP,
     )
 
 
 def client_assume(config, arguments):
     address = ':'.join([IP_ADDRESS, str(arguments.port)])
-    url = 'http://' + address + CONTROL_PATH % 'assume'
+    url = 'http://' + address + CONTROL_PATH_ASSUME
 
     profile_config = _get_profile_config(config, arguments.profile)
+    profile_config['profile_name'] = arguments.profile
+
     response = requests.post(url, json=profile_config)
     if response.status_code == 400 and 'MFA missing' in response.text:
         profile_config['mfa_token_code'] = input('Enter MFA: ')
@@ -449,6 +471,14 @@ def _get_profile_config(config, profile_name):
         return extended_config
     else:
         return profile_config
+
+
+def client_status(arguments):
+    address = ':'.join([IP_ADDRESS, str(arguments.port)])
+    url = 'http://' + address + CONTROL_PATH_STATUS
+
+    response = requests.get(url)
+    print(response.json())
 
 
 if __name__ == '__main__':
