@@ -34,7 +34,16 @@ sudo imsa start
 imsa assume profile_ONE
 # after this you can run a few aws commands that will use profile_TWO
 imsa assume profile_TWO
-# optional
+# if you then want to use profile_ONE in one shell while keep using profile_TWO
+# everywhere else, you can use the following which takes advantage of the
+# provider chain (see Configuration) by exporting environment variables - it
+# still tries to re-use the existing session so you only have to use MFA if
+# necessary - it also exports IMSA_PROFILE and IMSA_PROFILE_EXPIRATION which
+# you can for example display in your prompt
+eval $(imsa export profile_ONE)
+# optional - profile_TWO would become unavailable immediately while profile_ONE
+# would be available until the credentials expired(check the
+# IMSA_PROFILE_EXPIRATION environment variable)
 imsa stop
 ```
 
@@ -115,8 +124,8 @@ Configuration
 -------------
 
 IMSA is configured with a YAML file called `.imsa` located in your home
-directory. Only `imsa assume` reads this and then forwards configuration as
-necessary. Given the following example:
+directory. Only `imsa assume` and `imsa export` read this and then forward
+configuration as necessary. Given the following example:
 
 ```yaml
 
@@ -144,5 +153,5 @@ right in **IAM** and then copy them from there.
 
 Note the [provider chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence)
 where instance metadata is the last provider in the chain. So all other
-providers have to be absent in order for IMSA to work.  Conversely, you can for
+providers have to be absent in order for IMSA to work. Conversely, you can for
 example provide environment variables to temporarily use different credentials.

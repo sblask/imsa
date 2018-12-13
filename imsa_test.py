@@ -17,13 +17,16 @@ SAMPLE_CONFIG = {
     'role_session_name': 'SomeSessionName',
 }
 
-SAMPLE_CREDENTIALS_SESSION = {
-    'AccessKeyId': ACCESS_KEY_SESSION,
+SAMPLE_CREDENTIALS = {
+    'AccessKeyId': 'ZZZZZZZZZZZZZZZZZZZZ',
     'Expiration': datetime.datetime.utcnow() + datetime.timedelta(hours=1),
     'LastUpdated': datetime.datetime.utcnow(),
     'SecretAccessKey': 'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
     'SessionToken': 'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ',
 }
+
+SAMPLE_CREDENTIALS_SESSION = dict(SAMPLE_CREDENTIALS)
+SAMPLE_CREDENTIALS_SESSION['AccessKeyId'] = ACCESS_KEY_SESSION
 
 SAMPLE_CREDENTIALS_ROLE = dict(SAMPLE_CREDENTIALS_SESSION)
 SAMPLE_CREDENTIALS_ROLE['AccessKeyId'] = ACCESS_KEY_ROLE
@@ -232,6 +235,45 @@ class StateTests(unittest.TestCase):
             config[key] = 'new_value'
             assert not self.state.requires_mfa(config)
             self.state.update_credentials(config)
+
+    @unittest.mock.patch('imsa.get_new_role_credentials')
+    @unittest.mock.patch('imsa.get_new_session_credentials')
+    def test_temporary_credentials(self, get_session_mock, get_role_mock):
+        get_session_mock.return_value = SAMPLE_CREDENTIALS_SESSION
+        get_role_mock.return_value = SAMPLE_CREDENTIALS_ROLE
+
+        self.state.update_credentials(SAMPLE_CONFIG)
+
+        credentials = dict(self.state.get_credentials())
+
+        get_session_mock.reset_mock()
+        get_role_mock.reset_mock()
+
+        self.state.temporary_credentials(SAMPLE_CONFIG)
+
+        assert not get_session_mock.called
+        assert not get_role_mock.called
+
+        get_session_mock.return_value = SAMPLE_CREDENTIALS
+        get_role_mock.return_value = SAMPLE_CREDENTIALS
+        for key in SAMPLE_CONFIG:
+            config = dict(SAMPLE_CONFIG)
+            config[key] = 'new_value'
+
+            self.assertDictEqual(
+                self.state.temporary_credentials(config),
+                SAMPLE_CREDENTIALS,
+            )
+
+            self.assertDictEqual(
+                self.state.get_credentials(),
+                credentials,
+            )
+
+            self.assertNotEqual(
+                SAMPLE_CREDENTIALS['AccessKeyId'],
+                credentials['AccessKeyId'],
+            )
 
 
 class ConfigTests(unittest.TestCase):
