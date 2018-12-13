@@ -92,7 +92,12 @@ def __get_arguments():
 
 
 def __add_start_parser(parser):
-    start_parser = parser.add_parser('start')
+    start_parser = parser.add_parser(
+        'start',
+        help=(
+            'Start the instance metadata service'
+        ),
+    )
     start_parser.set_defaults(function=server_start)
     __add_common_arguments(start_parser)
 
@@ -103,13 +108,24 @@ def __add_start_parser(parser):
 
 
 def __add_stop_parser(parser):
-    stop_parser = parser.add_parser('stop')
+    stop_parser = parser.add_parser(
+        'stop',
+        help=(
+            'Stop the instance metadata service'
+        ),
+    )
     stop_parser.set_defaults(function=client_stop)
     __add_common_arguments(stop_parser)
 
 
 def __add_assume_parser(parser):
-    assume_parser = parser.add_parser('assume')
+    assume_parser = parser.add_parser(
+        'assume',
+        help=(
+            'Make credentials for the given profile available through the'
+            ' instance metadata service'
+        ),
+    )
     __add_common_arguments(assume_parser)
     __add_profile_argument(assume_parser, 'assume', client_assume)
 
@@ -134,13 +150,27 @@ def __add_profile_argument(subcommand_parser, command_name, default_function):
 
 
 def __add_export_parser(parser):
-    export_parser = parser.add_parser('export')
+    export_parser = parser.add_parser(
+        'export',
+        help=(
+            'Outputs environment variables with credentials for the given'
+            ' profile reusing existing credentials if possible, but without'
+            ' updating the credentials available through the instance metadata'
+            ' service'
+        ),
+    )
+
     __add_common_arguments(export_parser)
     __add_profile_argument(export_parser, 'export', client_export)
 
 
 def __add_status_parser(parser):
-    status_parser = parser.add_parser('status')
+    status_parser = parser.add_parser(
+        'status',
+        help=(
+            'Show information about current credentials'
+        ),
+    )
     status_parser.set_defaults(function=client_status)
     __add_common_arguments(status_parser)
 
