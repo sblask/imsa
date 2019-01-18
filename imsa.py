@@ -258,6 +258,14 @@ def have_credentials_expired(credentials):
     return expiration < soon
 
 
+def config_contains_role_config(new_config):
+    for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+        if key not in new_config:
+            logger.info('No %s in given config', key)
+            return False
+    return True
+
+
 def get_new_session_credentials(config):
     client = boto3.client(
         'sts',
@@ -351,7 +359,16 @@ class State():
         return new_session_credentials, new_role_credentials
 
     def ___new_role_credentials(self, new_config, new_session_credentials):
-        if self.__role_credentials and new_session_credentials:
+        if not config_contains_role_config(new_config):
+            return {}
+
+        if not self.__role_credentials:
+            logger.info('Config requires role credentials')
+            return get_new_role_credentials(
+                new_session_credentials or self.__session_credentials,
+                new_config,
+            )
+        if new_session_credentials:
             logger.info('Session updated, update role credentials')
             return get_new_role_credentials(
                 new_session_credentials,
@@ -360,22 +377,18 @@ class State():
         if have_credentials_expired(self.__role_credentials):
             logger.info('Role credentials have expired')
             return get_new_role_credentials(
-                new_session_credentials or self.__session_credentials,
+                self.__session_credentials,
                 new_config,
             )
-        if self.__new_role_credentials_required(new_config):
-            logger.info('Config requires new role credentials')
+        if self.__has_role_config_changed(new_config):
+            logger.info('Configured role has changed')
             return get_new_role_credentials(
-                new_session_credentials or self.__session_credentials,
+                self.__session_credentials,
                 new_config,
             )
 
-        if 'role_arn' in new_config:
-            logger.info('Role is configured but no update is necessary')
-            return None
-        else:
-            logger.info('Reset new role credentials')
-            return {}
+        logger.info('Role is configured but no update is necessary')
+        return None
 
     def update_role_credentials_if_expired(self):
         if have_credentials_expired(self.__role_credentials):
@@ -395,23 +408,11 @@ class State():
                 return True
         return False
 
-    def __new_role_credentials_required(self, new_config):
-        if not self.__role_credentials:
-            for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
-                if key not in new_config:
-                    logger.info('No %s in given config', key)
-                    return False
-            return True
-        else:
-            if have_credentials_expired(self.__role_credentials):
+    def __has_role_config_changed(self, new_config):
+        for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
+            if new_config.get(key, None) != self.__config.get(key, None):
                 return True
-            for key in CONFIG_KEYS_REQUIRING_ASSUME_ROLE:
-                if key not in new_config:
-                    logger.info('No %s in given config', key)
-                    return False
-                if new_config.get(key, None) != self.__config.get(key, None):
-                    return True
-            return False
+        return False
 
 
 @__register_route(INVALID_CREDENTIAL_PATH)

@@ -99,6 +99,35 @@ class StateTests(unittest.TestCase):
 
     @unittest.mock.patch('imsa.get_new_role_credentials')
     @unittest.mock.patch('imsa.get_new_session_credentials')
+    def test_expired_role_no_role(self, get_session_mock, get_role_mock):
+        get_session_mock.return_value = SAMPLE_CREDENTIALS_SESSION
+        get_role_mock.return_value = EXPIRED_CREDENTIALS_ROLE
+
+        assert self.state.requires_mfa(SAMPLE_CONFIG)
+
+        self.state.update_credentials(SAMPLE_CONFIG)
+        assert get_session_mock.called
+        assert get_role_mock.called
+
+        self.assert_access_key(ACCESS_KEY_ROLE)
+
+        get_session_mock.reset_mock()
+        get_role_mock.reset_mock()
+
+        config_without_role = {}
+        for key in imsa.CONFIG_KEYS_REQUIRING_SESSION_UPDATE:
+            config_without_role[key] = SAMPLE_CONFIG[key]
+
+        assert not self.state.requires_mfa(config_without_role)
+
+        self.state.update_credentials(config_without_role)
+        assert not get_session_mock.called
+        assert not get_role_mock.called
+
+        self.assert_access_key(ACCESS_KEY_SESSION)
+
+    @unittest.mock.patch('imsa.get_new_role_credentials')
+    @unittest.mock.patch('imsa.get_new_session_credentials')
     def test_no_update(self, get_session_mock, get_role_mock):
         get_session_mock.return_value = SAMPLE_CREDENTIALS_SESSION
         get_role_mock.return_value = SAMPLE_CREDENTIALS_ROLE
