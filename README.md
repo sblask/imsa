@@ -86,6 +86,9 @@ iface lo:imsa inet static
   netmask 255.255.255.0
 ```
 
+[This](https://www.aangelis.gr/blog/2016/04/multiple-loopback-ips-in-arch-linux)
+might be an alternative, but I did not test it.
+
 If you want to run IMSA at startup you can use the serviced unit file
 `imsa.service`(which assumes the above installation path):
 
