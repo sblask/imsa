@@ -13,7 +13,7 @@ time you run a command.
 SDKs.  It's a service running in the background that implements the instance
 metadata's credentials API and provides commands with temporary credentials.
 Once a session is created you won't need to re-enter an MFA token for the
-lifetime of the session(usually 12 hours) even if you switch roles. One
+lifetime of the session (usually 12 hours) even if you switch roles. One
 drawback of this is that only one role/profile can be active at a time whereas
 normally you can provide different profiles whenever you run a command. Also
 see the [EC2 documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials).
@@ -28,7 +28,7 @@ Usage
 # check out available options
 imsa --help
 # as the service run on port 80, sudo is required,
-# but you may want to run this on startup anyway(see Installation)
+# but you may want to run this on startup anyway (see Installation)
 sudo imsa start
 # after this you can run a few aws commands that will use profile_ONE
 imsa assume profile_ONE
@@ -63,9 +63,9 @@ sudo ln -s /opt/imsa/bin/imsa /usr/bin
 The instance metadata service in EC2 is available at 169.254.169.254. So you
 need to get your machine to listen at 169.254.169.254 too. As you do not want
 to expose your AWS credentials to the outside, you need to add the IP to your
-loopback device which restricts its availability to your machine(you still need
-to be careful with proxies and the like). This can be done in Linux(a way to
-make this work in Mac OS is described
+loopback device which restricts its availability to your machine (you still
+need to be careful with proxies and the like). This can be done in Linux (a way
+to make this work in Mac OS is described
 [here](https://blog.felipe-alfaro.com/2017/03/22/persistent-loopback-interfaces-in-mac-os-x/))
 by editing `/etc/network/interfaces`. Assuming it looks like this:
 
@@ -90,7 +90,7 @@ iface lo:imsa inet static
 might be an alternative, but I did not test it.
 
 If you want to run IMSA at startup you can use the serviced unit file
-`imsa.service`(which assumes the above installation path):
+`imsa.service` (which assumes the above installation path):
 
 ```
 sudo cp imsa.service /etc/systemd/system/
