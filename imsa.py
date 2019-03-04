@@ -51,6 +51,7 @@ CONTROL_PATH_STATUS = CONTROL_PATH % 'status'
 CONTROL_PATH_TEMPORARY_CREDENTIALS = CONTROL_PATH % 'temporary_credentials'
 
 MINIMUM_MINUTES_IN_SESSION = 5
+REFRESH_CHECK_INTERVAL = 3 * 60
 
 HELP_STRINGS = ['-h', '--h', '--he', '--hel', '--help']
 
@@ -308,11 +309,25 @@ class State():
         self.__session_credentials = {}
         self.__role_credentials = {}
 
+        self.schedule_refresh()
+
     @classmethod
     def get_instance(cls):
         if not hasattr(cls, 'instance'):
             cls.instance = State()
         return cls.instance
+
+    def schedule_refresh(self):
+        def maybe_refresh_credentials():
+            self.update_role_credentials_if_expired()
+            self.schedule_refresh()
+
+        timer = threading.Timer(
+            REFRESH_CHECK_INTERVAL,
+            maybe_refresh_credentials,
+        )
+        timer.daemon = True
+        timer.start()
 
     def get_status(self):
         return {'assumed_profile': self.__config.get('profile_name', None)}
@@ -429,7 +444,6 @@ def server_get_role_two(_request):
 def server_get_credentials(_request):
     try:
         state = State.get_instance()
-        state.update_role_credentials_if_expired()
         credentials = state.get_credentials()
         if not credentials:
             return pyramid.httpexceptions.HTTPNotFound('No role assumed')
