@@ -268,37 +268,45 @@ def config_contains_role_config(new_config):
 
 
 def get_new_session_credentials(config):
-    client = boto3.client(
-        'sts',
-        aws_access_key_id=config['aws_access_key_id'],
-        aws_secret_access_key=config['aws_secret_access_key'],
-    )
-    if 'mfa_serial_number' in config and 'mfa_token_code' in config:
-        response = client.get_session_token(
-            SerialNumber=config['mfa_serial_number'],
-            TokenCode=config['mfa_token_code'],
+    try:
+        client = boto3.client(
+            'sts',
+            aws_access_key_id=config['aws_access_key_id'],
+            aws_secret_access_key=config['aws_secret_access_key'],
         )
-    else:
-        response = client.get_session_token()
-    credentials = response['Credentials']
-    credentials['LastUpdated'] = datetime.datetime.utcnow()
-    return credentials
+        if 'mfa_serial_number' in config and 'mfa_token_code' in config:
+            response = client.get_session_token(
+                SerialNumber=config['mfa_serial_number'],
+                TokenCode=config['mfa_token_code'],
+            )
+        else:
+            response = client.get_session_token()
+        credentials = response['Credentials']
+        credentials['LastUpdated'] = datetime.datetime.utcnow()
+        return credentials
+    except Exception:
+        logging.exception('Could not get new session credentials')
+        raise
 
 
 def get_new_role_credentials(session_credentials, config):
-    client = boto3.client(
-        'sts',
-        aws_access_key_id=session_credentials['AccessKeyId'],
-        aws_secret_access_key=session_credentials['SecretAccessKey'],
-        aws_session_token=session_credentials['SessionToken'],
-    )
-    response = client.assume_role(
-        RoleArn=config['role_arn'],
-        RoleSessionName=config['role_session_name'],
-    )
-    credentials = response['Credentials']
-    credentials['LastUpdated'] = datetime.datetime.utcnow()
-    return credentials
+    try:
+        client = boto3.client(
+            'sts',
+            aws_access_key_id=session_credentials['AccessKeyId'],
+            aws_secret_access_key=session_credentials['SecretAccessKey'],
+            aws_session_token=session_credentials['SessionToken'],
+        )
+        response = client.assume_role(
+            RoleArn=config['role_arn'],
+            RoleSessionName=config['role_session_name'],
+        )
+        credentials = response['Credentials']
+        credentials['LastUpdated'] = datetime.datetime.utcnow()
+        return credentials
+    except Exception:
+        logging.exception('Could not get new role credentials')
+        raise
 
 
 class State():
