@@ -327,8 +327,10 @@ class State():
 
     def schedule_refresh(self):
         def maybe_refresh_credentials():
-            self.update_role_credentials_if_expired()
+            logger.info('Maybe refresh credentials')
             self.schedule_refresh()
+            logger.info('Scheduled')
+            self.update_role_credentials_if_expired()
 
         timer = threading.Timer(
             REFRESH_CHECK_INTERVAL,
