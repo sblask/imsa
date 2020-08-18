@@ -1,7 +1,7 @@
-[![Build Status](https://travis-ci.org/sblask/imsa.svg?branch=master)](https://travis-ci.org/sblask/imsa)
-
 IMSA (Instance Metadata Service for Authentication)
 ===================================================
+
+[![Build Status](https://travis-ci.org/sblask/imsa.svg?branch=master)](https://travis-ci.org/sblask/imsa)
 
 If you use **AWS**, you probably know what access keys are. In their basic form
 they are very simple to use. However, if you set up MFA or need to assume an
@@ -69,14 +69,14 @@ to make this work in Mac OS is described
 [here](https://blog.felipe-alfaro.com/2017/03/22/persistent-loopback-interfaces-in-mac-os-x/))
 by editing `/etc/network/interfaces`. Assuming it looks like this:
 
-```
+```text
 auto lo
 iface lo inet loopback
 ```
 
 You need to change it to this:
 
-```
+```text
 auto lo lo:imsa
 iface lo inet loopback
 
@@ -92,7 +92,7 @@ might be an alternative, but I did not test it.
 If you want to run IMSA at startup you can use the serviced unit file
 `imsa.service` (which assumes the above installation path):
 
-```
+```bash
 sudo cp imsa.service /etc/systemd/system/
 sudo systemctl enable imsa.service
 ```
@@ -100,7 +100,7 @@ sudo systemctl enable imsa.service
 If you don't want to reboot your machine to make the IP setup work and IMSA
 start up, you can run the following:
 
-```
+```bash
 sudo systemctl restart networking.service
 sudo systemctl start imsa.service
 ```
@@ -108,20 +108,19 @@ sudo systemctl start imsa.service
 Completions are available through
 [argcomplete](https://pypi.org/project/argcomplete/) so you can do:
 
-```
+```bash
 eval "$(/opt/imsa/bin/register-python-argcomplete imsa)"
 ```
 
 to get completions to work for your current shell session or you can pipe the
 output of:
 
-```
+```bash
 /opt/imsa/bin/register-python-argcomplete imsa
 ```
 
 into a file that you source from your shell rc file. See
 [argcomplete](https://pypi.org/project/argcomplete/) for more details.
-
 
 Configuration
 -------------
@@ -154,7 +153,8 @@ two extend `some_base_profile` which means that they use the values from
 values in the example. No sanity check is done, so you have to get the values
 right in **IAM** and then copy them from there.
 
-Note the [provider chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence)
+Note the [provider
+chain](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html#cli-configure-quickstart-precedence)
 where instance metadata is the last provider in the chain. So all other
 providers have to be absent in order for IMSA to work. Conversely, you can for
 example provide environment variables to temporarily use different credentials.
