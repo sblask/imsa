@@ -1,0 +1,26 @@
+name: Converted Workflow
+
+on:
+  push:
+
+jobs:
+  Build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-20.04
+        python-version:
+          - 3.9
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v2
+      - run: pip install pycodestyle
+      - run: pip install pylint
+      - run: pip install --requirement requirements.txt
+      - run: pycodestyle imsa.py imsa_test.py
+      - run: pylint imsa.py imsa_test.py
+      - run: python imsa_test.py
