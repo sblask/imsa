@@ -44,6 +44,7 @@ INVALID_CREDENTIAL_PATH = '/latest/meta-data/iam/security-credentials'
 CREDENTIAL_PATH = INVALID_CREDENTIAL_PATH + '/'
 DUMMY_ROLE = 'imsa'
 
+# pylint: disable=consider-using-f-string
 CONTROL_PATH = '/__imsa/%s/'
 CONTROL_PATH_ASSUME = CONTROL_PATH % 'assume'
 CONTROL_PATH_STOP = CONTROL_PATH % 'stop'
@@ -70,8 +71,8 @@ def main():
 
 
 def __load_config():
-    with open(CONFIG_PATH, 'r') as file_object:
-        return yaml.load(file_object)
+    with open(CONFIG_PATH, 'r', encoding="utf8") as file_object:
+        return yaml.safe_load(file_object)
 
 
 def __get_arguments():
@@ -134,7 +135,7 @@ def __add_assume_parser(parser):
 def __add_profile_argument(subcommand_parser, command_name, default_function):
     profile_argument = subcommand_parser.add_argument('profile')
 
-    is_help_call = any([string in sys.argv for string in HELP_STRINGS])
+    is_help_call = any(string in sys.argv for string in HELP_STRINGS)
     # config should only be loaded for commands that need it, not the others
     # this IF is required as parse_known_args would break argcomplete and help
     if len(sys.argv) > 1 and sys.argv[1] == command_name or is_help_call:
