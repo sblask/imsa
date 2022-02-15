@@ -1,7 +1,7 @@
 IMSA (Instance Metadata Service for Authentication)
 ===================================================
 
-[![Build Status](https://travis-ci.org/sblask/imsa.svg?branch=master)](https://travis-ci.org/sblask/imsa)
+[![Build Status](https://github.com/sblask/imsa/actions/workflows/build.yml/badge.svg)](https://github.com/sblask/imsa/actions/workflows/build.yml)
 
 If you use **AWS**, you probably know what access keys are. In their basic form
 they are very simple to use. However, if you set up MFA or need to assume an
